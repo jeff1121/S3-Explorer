@@ -1,0 +1,208 @@
+openapi: 3.0.3
+info:
+  title: MVP S3 Desktop App Local API
+  version: 0.1.0
+  description: Local-only service surface for UI <-> core (can be realized as in-process service). All operations are synchronous unless marked async via taskId.
+servers:
+  - url: http://localhost:8080
+    description: Placeholder if IPC/HTTP is used; in-app calls may bypass HTTP.
+
+paths:
+  /profiles:
+    get:
+      summary: List connection profiles
+      responses:
+        '200': { description: OK }
+    post:
+      summary: Create/update a profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConnectionProfile'
+      responses:
+        '201': { description: Created }
+
+  /profiles/{id}:
+    delete:
+      summary: Delete profile
+      responses:
+        '204': { description: Deleted }
+
+  /profiles/{id}/buckets:
+    get:
+      summary: List buckets for profile
+      responses:
+        '200': { description: OK }
+
+  /profiles/{id}/objects:
+    get:
+      summary: List objects
+      parameters:
+        - in: query
+          name: bucket
+          required: true
+          schema: { type: string }
+        - in: query
+          name: prefix
+          required: false
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+
+  /transfer-tasks:
+    post:
+      summary: Enqueue transfer (upload/download/copy/move/delete)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferTaskRequest'
+      responses:
+        '202': { description: Accepted, returns taskId }
+    get:
+      summary: List transfer tasks
+      responses:
+        '200': { description: OK }
+
+  /transfer-tasks/{taskId}:
+    patch:
+      summary: Pause/resume/cancel task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+                  enum: [pause, resume, cancel, retry]
+      responses:
+        '200': { description: Updated }
+
+  /presigned-url:
+    post:
+      summary: Generate presigned URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PresignRequest'
+      responses:
+        '200': { description: URL returned }
+
+  /bookmarks:
+    get:
+      summary: List bookmarks
+      responses:
+        '200': { description: OK }
+    post:
+      summary: Create bookmark
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Bookmark'
+      responses:
+        '201': { description: Created }
+
+  /sync-jobs:
+    post:
+      summary: Enqueue sync/mirror job
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncJobRequest'
+      responses:
+        '202': { description: Accepted }
+
+components:
+  schemas:
+    ConnectionProfile:
+      type: object
+      required: [id, name, endpoint, region, accessKeyId, secretKey]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        endpoint: { type: string, format: uri }
+        region: { type: string }
+        accessKeyId: { type: string }
+        secretKey: { type: string }
+        defaultBucket: { type: string }
+        defaultPrefix: { type: string }
+        concurrency: { type: integer, default: 3 }
+        partSizeMB: { type: integer, default: 8, minimum: 5 }
+        retryPolicy:
+          type: object
+          properties:
+            maxAttempts: { type: integer, default: 3 }
+            backoffMs: { type: integer, default: 500 }
+
+    TransferTaskRequest:
+      type: object
+      required: [type, source, target]
+      properties:
+        type:
+          type: string
+          enum: [upload, download, copy, move, delete]
+        source:
+          $ref: '#/components/schemas/EndpointRef'
+        target:
+          $ref: '#/components/schemas/EndpointRef'
+        useMultipart: { type: boolean, default: true }
+        partSizeMB: { type: integer }
+        concurrency: { type: integer }
+        overwrite: { type: boolean, default: true }
+
+    SyncJobRequest:
+      type: object
+      required: [source, target, mode, conflictPolicy]
+      properties:
+        source: { $ref: '#/components/schemas/EndpointRef' }
+        target: { $ref: '#/components/schemas/EndpointRef' }
+        mode:
+          type: string
+          enum: [one-way, mirror]
+        conflictPolicy:
+          type: string
+          enum: [overwrite, skip, keep-both]
+
+    EndpointRef:
+      type: object
+      properties:
+        profileId: { type: string }
+        bucket: { type: string }
+        key: { type: string }
+        localPath: { type: string }
+
+    PresignRequest:
+      type: object
+      required: [profileId, bucket, key, action, expiresInSeconds]
+      properties:
+        profileId: { type: string }
+        bucket: { type: string }
+        key: { type: string }
+        action:
+          type: string
+          enum: [get, put]
+        expiresInSeconds:
+          type: integer
+          minimum: 60
+          maximum: 604800
+
+    Bookmark:
+      type: object
+      required: [label, bucket, prefix, profileId]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        bucket: { type: string }
+        prefix: { type: string }
+        profileId: { type: string }
