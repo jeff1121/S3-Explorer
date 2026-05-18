@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: MVP S3 Desktop App Local API
-  version: 0.1.0
+  version: 1.0.1
   description: Local-only service surface for UI <-> core (can be realized as in-process service). All operations are synchronous unless marked async via taskId.
 servers:
   - url: http://localhost:8080

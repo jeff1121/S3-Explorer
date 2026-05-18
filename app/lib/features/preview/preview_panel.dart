@@ -2,7 +2,11 @@ import 'package:app/features/preview/preview_service.dart';
 import 'package:flutter/material.dart';
 
 class PreviewPanel extends StatefulWidget {
-  const PreviewPanel({super.key, required this.bucket, required this.keyName, required this.service});
+  const PreviewPanel(
+      {super.key,
+      required this.bucket,
+      required this.keyName,
+      required this.service});
 
   final String bucket;
   final String keyName;
@@ -42,7 +46,6 @@ class _PreviewPanelState extends State<PreviewPanel> {
           case PreviewType.image:
             return Image.memory(result.bytes!);
           case PreviewType.unsupported:
-          default:
             return Text('不支援的格式 (${result.contentType})');
         }
       },

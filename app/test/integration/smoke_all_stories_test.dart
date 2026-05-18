@@ -12,7 +12,7 @@ import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 
 /// Smoke test covering all three user stories
-/// 
+///
 /// US1: Connection and basic file operations
 /// US2: Transfer queue and preview
 /// US3: Permissions and sync
@@ -62,7 +62,8 @@ void main() {
       service = ObjectService(client: client, queue: queue);
       previewService = PreviewService(client: client);
       permissionsService = PermissionsService(client: client);
-      syncService = SyncService(objectService: service, client: client, queue: queue);
+      syncService =
+          SyncService(objectService: service, client: client, queue: queue);
     });
 
     tearDown(() {
@@ -71,7 +72,7 @@ void main() {
 
     test('US1: Basic file operations', () async {
       final bucketName = bucket!.toLowerCase().replaceAll('_', '-');
-      
+
       // Ensure bucket exists
       final buckets = await service.listBuckets();
       if (!buckets.contains(bucketName)) {
@@ -90,18 +91,22 @@ void main() {
 
       // Upload
       final uploadTask = await service.upload(bucketName, key, testFile.path);
-      final completedUpload = await queue.waitFor(uploadTask.id).timeout(const Duration(seconds: 15));
+      final completedUpload = await queue
+          .waitFor(uploadTask.id)
+          .timeout(const Duration(seconds: 15));
       expect(completedUpload.status, equals(TransferStatus.completed));
 
       // List objects
-      final objects = await service.listObjects(bucketName, prefix: 'smoke-test/us1/');
+      final objects =
+          await service.listObjects(bucketName, prefix: 'smoke-test/us1/');
       expect(objects.any((o) => o.key == key), isTrue);
 
       // Download
       final downloadPath = p.join(tempDir.path, 'downloaded.txt');
-      final downloadTask = await service.download(bucketName, key, downloadPath);
+      final downloadTask =
+          await service.download(bucketName, key, downloadPath);
       await queue.waitFor(downloadTask.id).timeout(const Duration(seconds: 15));
-      
+
       final content = await File(downloadPath).readAsString();
       expect(content, equals('Smoke test content for US1'));
 
@@ -113,7 +118,7 @@ void main() {
     test('US2: Preview', () async {
       final bucketName = bucket!.toLowerCase().replaceAll('_', '-');
       final tempDir = await Directory.systemTemp.createTemp('smoke-us2-');
-      
+
       final textFile = File(p.join(tempDir.path, 'preview.txt'));
       await textFile.writeAsString('Preview test content\nLine 2\nLine 3');
 
@@ -158,3 +163,4 @@ void main() {
     });
   });
 }
+// ignore_for_file: avoid_print

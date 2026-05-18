@@ -1,18 +1,12 @@
+import 'package:app/models/entities.dart' show EndpointRef, TransferStatus;
+import 'package:app/services/object_service.dart';
+import 'package:app/services/s3_client.dart';
+import 'package:app/services/sync_service.dart';
+import 'package:app/services/transfer_queue.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../services/sync_service.dart';
-import '../../services/s3_client.dart';
-import '../../models/connection_profile.dart';
 
-/// Sync/Mirror task management screen
-/// 
-/// Features:
-/// - Configure source and target (bucket/prefix)
-/// - Select sync strategy (one-way, mirror)
-/// - Configure conflict policy (overwrite, skip, keepBoth)
-/// - Preview sync plan before execution
-/// - Execute sync with progress tracking
-/// - View sync results and logs
+/// Sync/Mirror task management screen.
 class SyncScreen extends StatefulWidget {
   const SyncScreen({super.key});
 
@@ -22,33 +16,17 @@ class SyncScreen extends StatefulWidget {
 
 class _SyncScreenState extends State<SyncScreen> {
   final _formKey = GlobalKey<FormState>();
-  
-  // Source configuration
+
   String _sourceBucket = '';
   String _sourcePrefix = '';
-  
-  // Target configuration
   String _targetBucket = '';
   String _targetPrefix = '';
-  
-  // Sync configuration
-  SyncStrategy _strategy = SyncStrategy.oneWay;
+  SyncMode _mode = SyncMode.oneWay;
   ConflictPolicy _conflictPolicy = ConflictPolicy.overwrite;
-  bool _deleteExtraFiles = false;
   bool _dryRun = true;
-  
-  // State
   bool _isSyncing = false;
-  SyncResult? _lastResult;
+  SyncJob? _lastJob;
   String? _error;
-
-  late SyncService _syncService;
-
-  @override
-  void initState() {
-    super.initState();
-    _syncService = SyncService(context.read<S3Client>());
-  }
 
   Future<void> _executeSyncTask() async {
     if (!_formKey.currentState!.validate()) return;
@@ -56,36 +34,55 @@ class _SyncScreenState extends State<SyncScreen> {
     setState(() {
       _isSyncing = true;
       _error = null;
-      _lastResult = null;
+      _lastJob = null;
     });
 
     try {
-      final config = SyncConfiguration(
-        sourceBucket: _sourceBucket,
-        sourcePrefix: _sourcePrefix,
-        targetBucket: _targetBucket,
-        targetPrefix: _targetPrefix,
-        strategy: _strategy,
-        conflictPolicy: _conflictPolicy,
-        deleteExtraFiles: _deleteExtraFiles,
-        dryRun: _dryRun,
+      final client = context.read<S3Client>();
+      final queue = context.read<TransferQueue>();
+      final objectService = ObjectService(client: client, queue: queue);
+      final syncService = SyncService(
+        client: client,
+        queue: queue,
+        objectService: objectService,
       );
 
-      final result = await _syncService.sync(config);
-      
-      setState(() {
-        _lastResult = result;
-        _isSyncing = false;
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_dryRun ? '同步預覽完成' : '同步完成'),
-            backgroundColor: Colors.green,
-          ),
+      if (_dryRun) {
+        final sourceObjects = await objectService.listObjects(
+          _sourceBucket,
+          prefix: _normalizedPrefix(_sourcePrefix),
+        );
+        _lastJob = SyncJob(
+          id: 'dry-run',
+          name: '同步預覽',
+          source: EndpointRef(
+              bucket: _sourceBucket, key: _normalizedPrefix(_sourcePrefix)),
+          target: EndpointRef(
+              bucket: _targetBucket, key: _normalizedPrefix(_targetPrefix)),
+          mode: _mode,
+          conflictPolicy: _conflictPolicy,
+          status: TransferStatus.completed,
+          filesScanned: sourceObjects.length,
+          totalBytes:
+              sourceObjects.fold<int>(0, (sum, item) => sum + item.sizeBytes),
+        );
+      } else {
+        _lastJob = await syncService.startSync(
+          name: '$_sourceBucket -> $_targetBucket',
+          source: EndpointRef(
+              bucket: _sourceBucket, key: _normalizedPrefix(_sourcePrefix)),
+          target: EndpointRef(
+              bucket: _targetBucket, key: _normalizedPrefix(_targetPrefix)),
+          mode: _mode,
+          conflictPolicy: _conflictPolicy,
         );
       }
+
+      if (!mounted) return;
+      setState(() => _isSyncing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_dryRun ? '同步預覽完成' : '同步工作已啟動')),
+      );
     } catch (e) {
       setState(() {
         _error = '同步失敗: $e';
@@ -102,11 +99,11 @@ class _SyncScreenState extends State<SyncScreen> {
       appBar: AppBar(
         title: const Text('同步/鏡像任務'),
         actions: [
-          if (_lastResult != null)
+          if (_lastJob != null)
             IconButton(
               icon: const Icon(Icons.history),
-              onPressed: () => _showResultDetails(),
-              tooltip: '查看同步結果',
+              onPressed: _showResultDetails,
+              tooltip: '查看同步工作',
             ),
         ],
       ),
@@ -117,220 +114,89 @@ class _SyncScreenState extends State<SyncScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Source Configuration Card
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '來源設定',
-                        style: theme.textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        decoration: const InputDecoration(
-                          labelText: 'Source Bucket *',
-                          hintText: 'my-source-bucket',
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: (value) =>
-                            value?.isEmpty == true ? '請輸入 Bucket 名稱' : null,
-                        onChanged: (value) => _sourceBucket = value,
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        decoration: const InputDecoration(
-                          labelText: 'Source Prefix (選填)',
-                          hintText: 'folder/subfolder/',
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: (value) => _sourcePrefix = value,
-                      ),
-                    ],
-                  ),
-                ),
+              _buildEndpointCard(
+                title: '來源設定',
+                bucketLabel: 'Source Bucket *',
+                prefixLabel: 'Source Prefix',
+                onBucketChanged: (value) => _sourceBucket = value,
+                onPrefixChanged: (value) => _sourcePrefix = value,
               ),
               const SizedBox(height: 16),
-
-              // Target Configuration Card
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '目標設定',
-                        style: theme.textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        decoration: const InputDecoration(
-                          labelText: 'Target Bucket *',
-                          hintText: 'my-target-bucket',
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: (value) =>
-                            value?.isEmpty == true ? '請輸入 Bucket 名稱' : null,
-                        onChanged: (value) => _targetBucket = value,
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        decoration: const InputDecoration(
-                          labelText: 'Target Prefix (選填)',
-                          hintText: 'backup/folder/',
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: (value) => _targetPrefix = value,
-                      ),
-                    ],
-                  ),
-                ),
+              _buildEndpointCard(
+                title: '目標設定',
+                bucketLabel: 'Target Bucket *',
+                prefixLabel: 'Target Prefix',
+                onBucketChanged: (value) => _targetBucket = value,
+                onPrefixChanged: (value) => _targetPrefix = value,
               ),
               const SizedBox(height: 16),
-
-              // Sync Strategy Card
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        '同步策略',
-                        style: theme.textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 12),
-                      ListTile(
-                        title: const Text('單向同步 (One-way)'),
-                        subtitle: const Text('僅將來源的變更同步到目標'),
-                        leading: Radio<SyncStrategy>(
-                          value: SyncStrategy.oneWay,
-                          groupValue: _strategy,
-                          onChanged: (value) =>
-                              setState(() => _strategy = value!),
-                        ),
-                      ),
-                      ListTile(
-                        title: const Text('鏡像 (Mirror)'),
-                        subtitle: const Text('目標完全鏡像來源，刪除目標額外檔案'),
-                        leading: Radio<SyncStrategy>(
-                          value: SyncStrategy.mirror,
-                          groupValue: _strategy,
-                          onChanged: (value) =>
-                              setState(() => _strategy = value!),
-                        ),
-                      ),
-                      const Divider(),
-                      Text(
-                        '衝突處理',
-                        style: theme.textTheme.titleSmall,
-                      ),
+                      Text('同步策略', style: theme.textTheme.titleMedium),
                       const SizedBox(height: 8),
-                      DropdownButtonFormField<ConflictPolicy>(
-                        value: _conflictPolicy,
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
+                      SegmentedButton<SyncMode>(
+                        segments: const [
+                          ButtonSegment(
+                            value: SyncMode.oneWay,
+                            label: Text('單向同步'),
+                            icon: Icon(Icons.arrow_forward),
                           ),
+                          ButtonSegment(
+                            value: SyncMode.mirror,
+                            label: Text('鏡像'),
+                            icon: Icon(Icons.sync_alt),
+                          ),
+                        ],
+                        selected: {_mode},
+                        onSelectionChanged: (selection) =>
+                            setState(() => _mode = selection.first),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<ConflictPolicy>(
+                        initialValue: _conflictPolicy,
+                        decoration: const InputDecoration(
+                          labelText: '衝突處理',
+                          border: OutlineInputBorder(),
                         ),
                         items: const [
                           DropdownMenuItem(
                             value: ConflictPolicy.overwrite,
-                            child: Text('覆寫 (Overwrite)'),
+                            child: Text('覆寫'),
                           ),
                           DropdownMenuItem(
                             value: ConflictPolicy.skip,
-                            child: Text('跳過 (Skip)'),
+                            child: Text('跳過'),
                           ),
                           DropdownMenuItem(
                             value: ConflictPolicy.keepBoth,
-                            child: Text('保留兩者 (Keep Both)'),
+                            child: Text('保留兩者'),
                           ),
                         ],
                         onChanged: (value) =>
                             setState(() => _conflictPolicy = value!),
                       ),
-                      const SizedBox(height: 12),
                       SwitchListTile(
-                        title: const Text('刪除目標額外檔案'),
-                        subtitle: const Text('刪除來源不存在但目標存在的檔案'),
-                        value: _deleteExtraFiles,
-                        onChanged: (value) =>
-                            setState(() => _deleteExtraFiles = value),
-                      ),
-                      SwitchListTile(
-                        title: const Text('預覽模式 (Dry Run)'),
-                        subtitle: const Text('不實際執行，僅顯示將執行的操作'),
                         value: _dryRun,
                         onChanged: (value) => setState(() => _dryRun = value),
+                        title: const Text('預覽模式'),
+                        subtitle: const Text('只掃描來源並顯示預估，不執行寫入或刪除'),
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
-
-              // Error Display
+              const SizedBox(height: 16),
               if (_error != null)
-                Card(
-                  color: theme.colorScheme.errorContainer,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.error,
-                          color: theme.colorScheme.error,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            _error!,
-                            style: TextStyle(
-                              color: theme.colorScheme.onErrorContainer,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-              // Last Result Summary
-              if (_lastResult != null)
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              '上次同步結果',
-                              style: theme.textTheme.titleMedium,
-                            ),
-                            TextButton(
-                              onPressed: _showResultDetails,
-                              child: const Text('詳細資訊'),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        _buildResultSummary(_lastResult!),
-                      ],
-                    ),
-                  ),
-                ),
+                Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+              if (_lastJob != null) ...[
+                const SizedBox(height: 16),
+                _buildResultCard(_lastJob!),
+              ],
               const SizedBox(height: 24),
-
-              // Execute Button
               SizedBox(
                 width: double.infinity,
                 height: 48,
@@ -343,16 +209,8 @@ class _SyncScreenState extends State<SyncScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : Icon(_dryRun ? Icons.preview : Icons.sync),
-                  label: Text(_isSyncing
-                      ? '同步中...'
-                      : _dryRun
-                          ? '預覽同步計畫'
-                          : '執行同步'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _dryRun
-                        ? theme.colorScheme.secondary
-                        : theme.colorScheme.primary,
-                  ),
+                  label: Text(
+                      _isSyncing ? '處理中...' : (_dryRun ? '預覽同步計畫' : '執行同步')),
                 ),
               ),
             ],
@@ -362,132 +220,85 @@ class _SyncScreenState extends State<SyncScreen> {
     );
   }
 
-  Widget _buildResultSummary(SyncResult result) {
-    return Column(
-      children: [
-        _buildResultRow('已複製', result.copiedCount, Icons.file_copy),
-        _buildResultRow('已更新', result.updatedCount, Icons.update),
-        _buildResultRow('已刪除', result.deletedCount, Icons.delete),
-        _buildResultRow('已跳過', result.skippedCount, Icons.skip_next),
-        if (result.errorCount > 0)
-          _buildResultRow(
-            '錯誤',
-            result.errorCount,
-            Icons.error,
-            color: Theme.of(context).colorScheme.error,
-          ),
-        const Divider(),
-        _buildResultRow(
-          '總計',
-          result.copiedCount +
-              result.updatedCount +
-              result.deletedCount +
-              result.skippedCount,
-          Icons.check_circle,
-          isBold: true,
+  Widget _buildEndpointCard({
+    required String title,
+    required String bucketLabel,
+    required String prefixLabel,
+    required ValueChanged<String> onBucketChanged,
+    required ValueChanged<String> onPrefixChanged,
+  }) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 12),
+            TextFormField(
+              decoration: InputDecoration(
+                  labelText: bucketLabel, border: const OutlineInputBorder()),
+              validator: (value) => value == null || value.trim().isEmpty
+                  ? '請輸入 Bucket 名稱'
+                  : null,
+              onChanged: onBucketChanged,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              decoration: InputDecoration(
+                  labelText: prefixLabel, border: const OutlineInputBorder()),
+              onChanged: onPrefixChanged,
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
-  Widget _buildResultRow(
-    String label,
-    int count,
-    IconData icon, {
-    Color? color,
-    bool isBold = false,
-  }) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 20, color: color),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-                ),
-              ),
-            ],
-          ),
-          Text(
-            count.toString(),
-            style: TextStyle(
-              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-              color: color,
-            ),
-          ),
-        ],
+  Widget _buildResultCard(SyncJob job) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('上次同步工作', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text('狀態: ${job.status.name}'),
+            Text('掃描檔案: ${job.filesScanned}'),
+            Text('已傳輸檔案: ${job.filesTransferred}'),
+            Text('傳輸位元組: ${job.bytesTransferred} / ${job.totalBytes}'),
+            if (job.errors.isNotEmpty) Text('錯誤: ${job.errors.length}'),
+          ],
+        ),
       ),
     );
   }
 
   void _showResultDetails() {
-    if (_lastResult == null) return;
+    final job = _lastJob;
+    if (job == null) return;
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('同步詳細結果'),
+        title: const Text('同步工作詳細資訊'),
         content: SizedBox(
-          width: 600,
-          height: 400,
+          width: 560,
           child: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text('執行時間: ${_formatDuration(_lastResult!.duration)}'),
-                const Divider(),
-                if (_lastResult!.copiedFiles.isNotEmpty) ...[
-                  const Text(
-                    '已複製檔案:',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  ..._lastResult!.copiedFiles
-                      .map((f) => Text('  • $f', style: const TextStyle(fontSize: 12))),
-                  const SizedBox(height: 8),
-                ],
-                if (_lastResult!.updatedFiles.isNotEmpty) ...[
-                  const Text(
-                    '已更新檔案:',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  ..._lastResult!.updatedFiles
-                      .map((f) => Text('  • $f', style: const TextStyle(fontSize: 12))),
-                  const SizedBox(height: 8),
-                ],
-                if (_lastResult!.deletedFiles.isNotEmpty) ...[
-                  const Text(
-                    '已刪除檔案:',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  ..._lastResult!.deletedFiles
-                      .map((f) => Text('  • $f', style: const TextStyle(fontSize: 12))),
-                  const SizedBox(height: 8),
-                ],
-                if (_lastResult!.skippedFiles.isNotEmpty) ...[
-                  const Text(
-                    '已跳過檔案:',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  ..._lastResult!.skippedFiles
-                      .map((f) => Text('  • $f', style: const TextStyle(fontSize: 12))),
-                  const SizedBox(height: 8),
-                ],
-                if (_lastResult!.errors.isNotEmpty) ...[
-                  const Text(
-                    '錯誤訊息:',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
-                  ),
-                  ..._lastResult!.errors.entries.map((e) => Text(
-                        '  • ${e.key}: ${e.value}',
-                        style: const TextStyle(fontSize: 12, color: Colors.red),
-                      )),
+                Text('工作名稱: ${job.name}'),
+                Text('狀態: ${job.status.name}'),
+                Text('來源: ${job.source.bucket}/${job.source.key ?? ''}'),
+                Text('目標: ${job.target.bucket}/${job.target.key ?? ''}'),
+                Text('模式: ${job.mode.name}'),
+                Text('衝突處理: ${job.conflictPolicy.name}'),
+                if (job.errors.isNotEmpty) ...[
+                  const Divider(),
+                  ...job.errors.map((error) => Text(error)),
                 ],
               ],
             ),
@@ -503,13 +314,9 @@ class _SyncScreenState extends State<SyncScreen> {
     );
   }
 
-  String _formatDuration(Duration duration) {
-    if (duration.inSeconds < 60) {
-      return '${duration.inSeconds} 秒';
-    } else if (duration.inMinutes < 60) {
-      return '${duration.inMinutes} 分 ${duration.inSeconds % 60} 秒';
-    } else {
-      return '${duration.inHours} 小時 ${duration.inMinutes % 60} 分';
-    }
+  String? _normalizedPrefix(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+    return trimmed.endsWith('/') ? trimmed : '$trimmed/';
   }
 }

@@ -8,7 +8,10 @@ import 'package:path/path.dart' as p;
 import 'package:aws_client/s3_2006_03_01.dart' as aws;
 
 class BrowserViewModel extends ChangeNotifier {
-  BrowserViewModel({required this.profile, required this.objectService, required this.queue});
+  BrowserViewModel(
+      {required this.profile,
+      required this.objectService,
+      required this.queue});
 
   final ConnectionProfile profile;
   final ObjectService objectService;
@@ -30,7 +33,8 @@ class BrowserViewModel extends ChangeNotifier {
     notifyListeners();
     try {
       buckets = await objectService.listBuckets();
-      currentBucket = profile.defaultBucket ?? (buckets.isNotEmpty ? buckets.first : null);
+      currentBucket =
+          profile.defaultBucket ?? (buckets.isNotEmpty ? buckets.first : null);
       prefix = _normalizePrefix(profile.defaultPrefix ?? '');
       if (currentBucket != null) {
         await refresh();
@@ -48,12 +52,15 @@ class BrowserViewModel extends ChangeNotifier {
     loading = true;
     notifyListeners();
     try {
-      objects = await objectService.listObjects(currentBucket!, prefix: prefix.isEmpty ? null : prefix);
+      objects = await objectService.listObjects(currentBucket!,
+          prefix: prefix.isEmpty ? null : prefix);
       error = null;
     } catch (e) {
       // Handle known errors with friendly messages
-      if (e.toString().contains('ChecksumAlgorithm') || e.toString().contains('CRC64NVME')) {
-        error = 'AWS S3 returned unsupported checksum algorithm. Please upgrade aws_client package or use different S3 endpoint.';
+      if (e.toString().contains('ChecksumAlgorithm') ||
+          e.toString().contains('CRC64NVME')) {
+        error =
+            'AWS S3 returned unsupported checksum algorithm. Please upgrade aws_client package or use different S3 endpoint.';
       } else {
         error = e.toString();
       }
@@ -88,7 +95,8 @@ class BrowserViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  List<ObjectNode> get selectedNodes => objects.where((o) => selectedKeys.contains(o.key)).toList();
+  List<ObjectNode> get selectedNodes =>
+      objects.where((o) => selectedKeys.contains(o.key)).toList();
 
   Future<void> uploadFiles(List<String> paths) async {
     if (currentBucket == null || paths.isEmpty) return;
@@ -100,7 +108,7 @@ class BrowserViewModel extends ChangeNotifier {
           debugPrint('[BrowserViewModel] Skipping non-file: $path');
           continue;
         }
-        
+
         final key = _toKey(p.basename(path));
         queue.enqueue(
           type: TransferType.upload,
@@ -225,18 +233,23 @@ class BrowserViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> copySelection(String targetBucket, String targetPrefix, {bool move = false}) async {
+  Future<void> copySelection(String targetBucket, String targetPrefix,
+      {bool move = false}) async {
     if (currentBucket == null || selectedKeys.isEmpty) return;
     working = true;
     notifyListeners();
     final normalizedPrefix = _normalizePrefix(targetPrefix);
     try {
       for (final node in selectedNodes) {
-        final destKey = normalizedPrefix.isEmpty ? node.key : '$normalizedPrefix${node.key}';
+        final destKey = normalizedPrefix.isEmpty
+            ? node.key
+            : '$normalizedPrefix${node.key}';
         if (move) {
-          await objectService.move(currentBucket!, node.key, targetBucket, destKey);
+          await objectService.move(
+              currentBucket!, node.key, targetBucket, destKey);
         } else {
-          await objectService.copy(currentBucket!, node.key, targetBucket, destKey);
+          await objectService.copy(
+              currentBucket!, node.key, targetBucket, destKey);
         }
       }
     } finally {
@@ -250,19 +263,19 @@ class BrowserViewModel extends ChangeNotifier {
     working = true;
     error = null;
     notifyListeners();
-    
+
     final urls = <String>[];
     try {
       for (final node in selectedNodes) {
         if (node.isFolder) continue; // Skip folders
-        
+
         // Set ACL to public-read
         await objectService.client.setObjectAcl(
           currentBucket!,
           node.key,
           aws.ObjectCannedACL.publicRead,
         );
-        
+
         // Generate public URL
         final url = objectService.client.getPublicUrl(currentBucket!, node.key);
         urls.add(url);
@@ -274,7 +287,7 @@ class BrowserViewModel extends ChangeNotifier {
       working = false;
       notifyListeners();
     }
-    
+
     return urls;
   }
 

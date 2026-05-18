@@ -6,7 +6,8 @@ import 'package:app/services/logging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
-typedef TransferExecutor = Future<void> Function(TransferTask task, TransferController control);
+typedef TransferExecutor = Future<void> Function(
+    TransferTask task, TransferController control);
 
 class TransferController {
   TransferController({required this.onProgress});
@@ -68,10 +69,11 @@ class TransferController {
 /// await queue.waitFor(task.id);
 /// ```
 class TransferQueue with ChangeNotifier {
-  TransferQueue({AppLogger? logger, this.maxConcurrent = 3}) : _logger = logger ?? const AppLogger();
+  TransferQueue({AppLogger? logger, this.maxConcurrent = 3})
+      : _logger = logger ?? const AppLogger();
 
   final AppLogger _logger;
-  
+
   /// Maximum number of tasks that can run concurrently.
   /// Default: 3. Recommended range: 1-10.
   final int maxConcurrent;
@@ -90,8 +92,14 @@ class TransferQueue with ChangeNotifier {
     if (completer != null) {
       return completer.future;
     }
-    final existing = _tasks.where((t) => t.id == taskId).cast<TransferTask?>().firstWhere((t) => t != null, orElse: () => null);
-    if (existing != null && (existing.status == TransferStatus.completed || existing.status == TransferStatus.failed || existing.status == TransferStatus.canceled)) {
+    final existing = _tasks
+        .where((t) => t.id == taskId)
+        .cast<TransferTask?>()
+        .firstWhere((t) => t != null, orElse: () => null);
+    if (existing != null &&
+        (existing.status == TransferStatus.completed ||
+            existing.status == TransferStatus.failed ||
+            existing.status == TransferStatus.canceled)) {
       return Future.value(existing);
     }
     return Future.error(StateError('Task $taskId not found'));
@@ -124,7 +132,8 @@ class TransferQueue with ChangeNotifier {
     if (executor != null) {
       _executors[task.id] = executor;
     }
-    _controllers[task.id] = TransferController(onProgress: (p) => _updateProgress(task.id, p));
+    _controllers[task.id] =
+        TransferController(onProgress: (p) => _updateProgress(task.id, p));
     _completers[task.id] = Completer<TransferTask>();
     _pending.add(task);
     notifyListeners();
@@ -176,14 +185,18 @@ class TransferQueue with ChangeNotifier {
     try {
       final executor = _executors[task.id];
       final controller = _controllers[task.id];
-      if (controller == null) throw StateError('No controller for task ${task.id}');
+      if (controller == null) {
+        throw StateError('No controller for task ${task.id}');
+      }
       controller.throwIfCanceled();
       await controller.waitIfPaused();
       if (executor != null) {
         await executor(task, controller);
       } else {
         await Future<void>.delayed(const Duration(milliseconds: 500));
-        controller.reportProgress(task.progress.copyWith(bytesTransferred: task.progress.totalBytes == 0 ? 1 : task.progress.totalBytes));
+        controller.reportProgress(task.progress.copyWith(
+            bytesTransferred:
+                task.progress.totalBytes == 0 ? 1 : task.progress.totalBytes));
       }
       controller.throwIfCanceled();
       _updateStatus(task.id, TransferStatus.completed);
@@ -193,7 +206,8 @@ class TransferQueue with ChangeNotifier {
       _logger.error('Task ${task.id} failed', e, st);
       final index = _tasks.indexWhere((t) => t.id == task.id);
       if (index != -1) {
-        _tasks[index] = _tasks[index].copyWith(status: TransferStatus.failed, error: e.toString());
+        _tasks[index] = _tasks[index]
+            .copyWith(status: TransferStatus.failed, error: e.toString());
         notifyListeners();
       }
       _completeTask(task.id, error: e);
@@ -210,7 +224,8 @@ class TransferQueue with ChangeNotifier {
     if (completer == null || completer.isCompleted) return;
     final index = _tasks.indexWhere((t) => t.id == taskId);
     if (index == -1) {
-      completer.completeError(StateError('Task $taskId missing after completion'));
+      completer
+          .completeError(StateError('Task $taskId missing after completion'));
       return;
     }
     final task = _tasks[index];

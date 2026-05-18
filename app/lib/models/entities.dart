@@ -55,7 +55,19 @@ class ConnectionProfile extends Equatable {
   }
 
   @override
-  List<Object?> get props => [id, name, endpoint, region, accessKeyId, secretKey, defaultBucket, defaultPrefix, concurrency, partSizeMb, retryPolicy];
+  List<Object?> get props => [
+        id,
+        name,
+        endpoint,
+        region,
+        accessKeyId,
+        secretKey,
+        defaultBucket,
+        defaultPrefix,
+        concurrency,
+        partSizeMb,
+        retryPolicy
+      ];
 }
 
 class RetryPolicy extends Equatable {
@@ -88,7 +100,8 @@ class ObjectNode extends Equatable {
   final String? contentType;
 
   @override
-  List<Object?> get props => [bucket, key, isFolder, sizeBytes, lastModified, etag, acl, contentType];
+  List<Object?> get props =>
+      [bucket, key, isFolder, sizeBytes, lastModified, etag, acl, contentType];
 }
 
 enum TransferType { upload, download, copy, move, delete, sync }
@@ -96,13 +109,21 @@ enum TransferType { upload, download, copy, move, delete, sync }
 enum TransferStatus { pending, running, paused, failed, completed, canceled }
 
 class TransferProgress extends Equatable {
-  const TransferProgress({this.bytesTransferred = 0, this.totalBytes = 0, this.partsCompleted, this.partsTotal});
+  const TransferProgress(
+      {this.bytesTransferred = 0,
+      this.totalBytes = 0,
+      this.partsCompleted,
+      this.partsTotal});
   final int bytesTransferred;
   final int totalBytes;
   final int? partsCompleted;
   final int? partsTotal;
 
-  TransferProgress copyWith({int? bytesTransferred, int? totalBytes, int? partsCompleted, int? partsTotal}) {
+  TransferProgress copyWith(
+      {int? bytesTransferred,
+      int? totalBytes,
+      int? partsCompleted,
+      int? partsTotal}) {
     return TransferProgress(
       bytesTransferred: bytesTransferred ?? this.bytesTransferred,
       totalBytes: totalBytes ?? this.totalBytes,
@@ -110,8 +131,10 @@ class TransferProgress extends Equatable {
       partsTotal: partsTotal ?? this.partsTotal,
     );
   }
+
   @override
-  List<Object?> get props => [bytesTransferred, totalBytes, partsCompleted, partsTotal];
+  List<Object?> get props =>
+      [bytesTransferred, totalBytes, partsCompleted, partsTotal];
 }
 
 class EndpointRef extends Equatable {
@@ -184,7 +207,22 @@ class TransferTask extends Equatable {
   }
 
   @override
-  List<Object?> get props => [id, type, source, target, useMultipart, partSizeMb, concurrency, overwrite, status, progress, retryCount, error, createdAt, updatedAt];
+  List<Object?> get props => [
+        id,
+        type,
+        source,
+        target,
+        useMultipart,
+        partSizeMb,
+        concurrency,
+        overwrite,
+        status,
+        progress,
+        retryCount,
+        error,
+        createdAt,
+        updatedAt
+      ];
 }
 
 class SyncJob extends Equatable {
@@ -207,7 +245,8 @@ class SyncJob extends Equatable {
   final SyncSummary summary;
 
   @override
-  List<Object?> get props => [id, source, target, mode, conflictPolicy, status, summary];
+  List<Object?> get props =>
+      [id, source, target, mode, conflictPolicy, status, summary];
 }
 
 enum SyncMode { oneWay, mirror }
@@ -217,7 +256,8 @@ enum ConflictPolicy { overwrite, skip, keepBoth }
 enum SyncStatus { pending, running, failed, completed }
 
 class SyncSummary extends Equatable {
-  const SyncSummary({this.added = 0, this.updated = 0, this.skipped = 0, this.conflicts = 0});
+  const SyncSummary(
+      {this.added = 0, this.updated = 0, this.skipped = 0, this.conflicts = 0});
   final int added;
   final int updated;
   final int skipped;
@@ -246,13 +286,19 @@ class PresignedUrlRecord extends Equatable {
   final Uri url;
 
   @override
-  List<Object?> get props => [id, bucket, key, action, expiresAt, generatedAt, url];
+  List<Object?> get props =>
+      [id, bucket, key, action, expiresAt, generatedAt, url];
 }
 
 enum PresignAction { get, put }
 
 class Bookmark extends Equatable {
-  const Bookmark({required this.id, required this.label, required this.bucket, required this.prefix, required this.profileId});
+  const Bookmark(
+      {required this.id,
+      required this.label,
+      required this.bucket,
+      required this.prefix,
+      required this.profileId});
   final String id;
   final String label;
   final String bucket;
@@ -263,14 +309,20 @@ class Bookmark extends Equatable {
 }
 
 class PolicyItem extends Equatable {
-  const PolicyItem({required this.scope, required this.type, this.statementSummary, this.cannedAcl, this.lastSyncedAt});
+  const PolicyItem(
+      {required this.scope,
+      required this.type,
+      this.statementSummary,
+      this.cannedAcl,
+      this.lastSyncedAt});
   final PolicyScope scope;
   final PolicyType type;
   final String? statementSummary;
   final String? cannedAcl;
   final DateTime? lastSyncedAt;
   @override
-  List<Object?> get props => [scope, type, statementSummary, cannedAcl, lastSyncedAt];
+  List<Object?> get props =>
+      [scope, type, statementSummary, cannedAcl, lastSyncedAt];
 }
 
 enum PolicyScope { bucket, object }

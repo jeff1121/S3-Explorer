@@ -26,7 +26,8 @@ class BrowserScreen extends StatelessWidget {
         final queue = context.read<TransferQueue>();
         final client = S3Client(profile: profile);
         final service = ObjectService(client: client, queue: queue);
-        final vm = BrowserViewModel(profile: profile, objectService: service, queue: queue);
+        final vm = BrowserViewModel(
+            profile: profile, objectService: service, queue: queue);
         vm.init();
         return vm;
       },
@@ -61,7 +62,6 @@ class _BrowserViewState extends State<_BrowserView> {
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<BrowserViewModel>();
-    final queue = context.watch<TransferQueue>();
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
@@ -81,90 +81,112 @@ class _BrowserViewState extends State<_BrowserView> {
                 Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (vm.error != null)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.red.shade200)),
-                      child: Text(vm.error!, style: theme.textTheme.bodyMedium?.copyWith(color: Colors.red.shade800)),
-                    ),
-                  const SizedBox(height: 8),
-                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (vm.error != null)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                              color: Colors.red.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.red.shade200)),
+                          child: Text(vm.error!,
+                              style: theme.textTheme.bodyMedium
+                                  ?.copyWith(color: Colors.red.shade800)),
+                        ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              initialValue: vm.currentBucket,
+                              hint: const Text('選擇 Bucket'),
+                              items: vm.buckets
+                                  .map((b) => DropdownMenuItem(
+                                      value: b, child: Text(b)))
+                                  .toList(),
+                              onChanged: (value) {
+                                if (value != null) vm.setBucket(value);
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextFormField(
+                              key: ValueKey(vm.prefix),
+                              initialValue: vm.prefix,
+                              decoration: const InputDecoration(
+                                  labelText: 'Prefix', hintText: 'e.g. logs/'),
+                              onFieldSubmitted: (value) => vm.setPrefix(value
+                                      .trim()
+                                      .isEmpty
+                                  ? ''
+                                  : (value.endsWith('/') ? value : '$value/')),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          IconButton(
+                              onPressed: vm.refresh,
+                              icon: const Icon(Icons.refresh)),
+                          const SizedBox(width: 12),
+                          ElevatedButton.icon(
+                            onPressed: vm.working
+                                ? null
+                                : () => _pickAndUpload(context, vm),
+                            icon: const Icon(Icons.file_upload),
+                            label: const Text('上傳'),
+                          ),
+                          const SizedBox(width: 8),
+                          OutlinedButton.icon(
+                            onPressed: vm.selectedKeys.isEmpty || vm.working
+                                ? null
+                                : () => _downloadSelection(context, vm),
+                            icon: const Icon(Icons.download),
+                            label: const Text('下載'),
+                          ),
+                          const SizedBox(width: 8),
+                          OutlinedButton.icon(
+                            onPressed: vm.selectedKeys.isEmpty || vm.working
+                                ? null
+                                : () => _makePublic(context, vm),
+                            icon: const Icon(Icons.public),
+                            label: const Text('公開'),
+                          ),
+                          const SizedBox(width: 8),
+                          TextButton.icon(
+                            onPressed: vm.selectedKeys.isEmpty || vm.working
+                                ? null
+                                : () => _confirmDelete(context, vm),
+                            icon: const Icon(Icons.delete_outline),
+                            label: const Text('刪除'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
                       Expanded(
-                        child: DropdownButtonFormField<String>(
-                          value: vm.currentBucket,
-                          hint: const Text('選擇 Bucket'),
-                          items: vm.buckets
-                              .map((b) => DropdownMenuItem(value: b, child: Text(b)))
-                              .toList(),
-                          onChanged: (value) {
-                            if (value != null) vm.setBucket(value);
-                          },
+                        child: Row(
+                          children: [
+                            Expanded(flex: 3, child: _objectPane(context, vm)),
+                            const SizedBox(width: 12),
+                            Expanded(flex: 2, child: _detailPane(context, vm)),
+                          ],
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextFormField(
-                          key: ValueKey(vm.prefix),
-                          initialValue: vm.prefix,
-                          decoration: const InputDecoration(labelText: 'Prefix', hintText: 'e.g. logs/'),
-                          onFieldSubmitted: (value) => vm.setPrefix(value.trim().isEmpty ? '' : (value.endsWith('/') ? value : '$value/')),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      IconButton(onPressed: vm.refresh, icon: const Icon(Icons.refresh)),
-                      const SizedBox(width: 12),
-                      ElevatedButton.icon(
-                        onPressed: vm.working ? null : () => _pickAndUpload(context, vm),
-                        icon: const Icon(Icons.file_upload),
-                        label: const Text('上傳'),
-                      ),
-                      const SizedBox(width: 8),
-                      OutlinedButton.icon(
-                        onPressed: vm.selectedKeys.isEmpty || vm.working ? null : () => _downloadSelection(context, vm),
-                        icon: const Icon(Icons.download),
-                        label: const Text('下載'),
-                      ),
-                      const SizedBox(width: 8),
-                      OutlinedButton.icon(
-                        onPressed: vm.selectedKeys.isEmpty || vm.working ? null : () => _makePublic(context, vm),
-                        icon: const Icon(Icons.public),
-                        label: const Text('公開'),
-                      ),
-                      const SizedBox(width: 8),
-                      TextButton.icon(
-                        onPressed: vm.selectedKeys.isEmpty || vm.working ? null : () => _confirmDelete(context, vm),
-                        icon: const Icon(Icons.delete_outline),
-                        label: const Text('刪除'),
-                      ),
+                      const SizedBox(height: 12),
+                      const TransferPanel(),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Expanded(flex: 3, child: _objectPane(context, vm)),
-                        const SizedBox(width: 12),
-                        Expanded(flex: 2, child: _detailPane(context, vm)),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const TransferPanel(),
-                ],
-              ),
-            ),
+                ),
                 if (_version.isNotEmpty)
                   Positioned(
                     right: 16,
                     bottom: 16,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.9),
+                        color: Colors.white.withValues(alpha: 0.9),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
@@ -198,8 +220,12 @@ class _BrowserViewState extends State<_BrowserView> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('物件 (${vm.objects.length})', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-                  Text('拖曳檔案至此區上傳', style: theme.textTheme.labelMedium?.copyWith(color: Colors.grey[700])),
+                  Text('物件 (${vm.objects.length})',
+                      style: theme.textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w700)),
+                  Text('拖曳檔案至此區上傳',
+                      style: theme.textTheme.labelMedium
+                          ?.copyWith(color: Colors.grey[700])),
                 ],
               ),
             ),
@@ -216,11 +242,22 @@ class _BrowserViewState extends State<_BrowserView> {
                         return ListTile(
                           selected: selected,
                           selectedTileColor: NowUITheme.surface,
-                          leading: Icon(obj.isFolder ? Icons.folder : Icons.insert_drive_file, color: obj.isFolder ? NowUITheme.primary : Colors.grey[700]),
-                          title: Text(obj.key, style: theme.textTheme.bodyLarge?.copyWith(fontWeight: selected ? FontWeight.w600 : FontWeight.w500)),
+                          leading: Icon(
+                              obj.isFolder
+                                  ? Icons.folder
+                                  : Icons.insert_drive_file,
+                              color: obj.isFolder
+                                  ? NowUITheme.primary
+                                  : Colors.grey[700]),
+                          title: Text(obj.key,
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                  fontWeight: selected
+                                      ? FontWeight.w600
+                                      : FontWeight.w500)),
                           subtitle: obj.isFolder
                               ? const Text('資料夾')
-                              : Text('${obj.sizeBytes} bytes · ${obj.lastModified.toLocal()}'),
+                              : Text(
+                                  '${obj.sizeBytes} bytes · ${obj.lastModified.toLocal()}'),
                           onTap: () {
                             if (obj.isFolder) {
                               vm.setPrefix(obj.key);
@@ -230,7 +267,9 @@ class _BrowserViewState extends State<_BrowserView> {
                           },
                           trailing: obj.isFolder
                               ? const Icon(Icons.chevron_right)
-                              : Checkbox(value: selected, onChanged: (_) => vm.toggleSelection(obj)),
+                              : Checkbox(
+                                  value: selected,
+                                  onChanged: (_) => vm.toggleSelection(obj)),
                         );
                       },
                     ),
@@ -247,13 +286,19 @@ class _BrowserViewState extends State<_BrowserView> {
     final primary = selected.isNotEmpty ? selected.first : null;
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)]),
+      decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)]),
       child: primary == null
-          ? Center(child: Text('選取檔案以查看詳細資訊', style: theme.textTheme.bodyMedium))
+          ? Center(
+              child: Text('選取檔案以查看詳細資訊', style: theme.textTheme.bodyMedium))
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(primary.key, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                Text(primary.key,
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w700)),
                 const SizedBox(height: 8),
                 Text('Bucket: ${primary.bucket}'),
                 Text('大小: ${primary.sizeBytes} bytes'),
@@ -265,22 +310,29 @@ class _BrowserViewState extends State<_BrowserView> {
                   runSpacing: 8,
                   children: [
                     ElevatedButton.icon(
-                      onPressed: vm.working ? null : () => _downloadSelection(context, vm),
+                      onPressed: vm.working
+                          ? null
+                          : () => _downloadSelection(context, vm),
                       icon: const Icon(Icons.download),
                       label: const Text('下載選取'),
                     ),
                     OutlinedButton.icon(
-                      onPressed: vm.working ? null : () => _copyOrMove(context, vm, move: false),
+                      onPressed: vm.working
+                          ? null
+                          : () => _copyOrMove(context, vm, move: false),
                       icon: const Icon(Icons.copy),
                       label: const Text('複製'),
                     ),
                     OutlinedButton.icon(
-                      onPressed: vm.working ? null : () => _copyOrMove(context, vm, move: true),
+                      onPressed: vm.working
+                          ? null
+                          : () => _copyOrMove(context, vm, move: true),
                       icon: const Icon(Icons.drive_file_move),
                       label: const Text('移動'),
                     ),
                     TextButton.icon(
-                      onPressed: vm.working ? null : () => _confirmDelete(context, vm),
+                      onPressed:
+                          vm.working ? null : () => _confirmDelete(context, vm),
                       icon: const Icon(Icons.delete_outline),
                       label: const Text('刪除'),
                     ),
@@ -298,7 +350,8 @@ class _BrowserViewState extends State<_BrowserView> {
     await vm.uploadFiles(paths);
   }
 
-  Future<void> _downloadSelection(BuildContext context, BrowserViewModel vm) async {
+  Future<void> _downloadSelection(
+      BuildContext context, BrowserViewModel vm) async {
     final directory = await FilePicker.platform.getDirectoryPath();
     if (directory == null) return;
     await vm.downloadSelection(directory);
@@ -310,7 +363,8 @@ class _BrowserViewState extends State<_BrowserView> {
       builder: (context) {
         return AlertDialog(
           title: const Text('設為公開存取'),
-          content: Text('確定將 ${vm.selectedKeys.length} 個檔案設為公開存取 (public-read)？'),
+          content:
+              Text('確定將 ${vm.selectedKeys.length} 個檔案設為公開存取 (public-read)？'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
@@ -324,15 +378,15 @@ class _BrowserViewState extends State<_BrowserView> {
         );
       },
     );
-    
+
     if (confirmed != true) return;
-    
+
     final urls = await vm.makeSelectedPublic();
-    
+
     if (urls.isEmpty) return;
-    
+
     if (!context.mounted) return;
-    
+
     // Show URLs in a dialog
     await showDialog(
       context: context,
@@ -360,7 +414,8 @@ class _BrowserViewState extends State<_BrowserView> {
                             Expanded(
                               child: SelectableText(
                                 url,
-                                style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                                style: const TextStyle(
+                                    fontSize: 12, fontFamily: 'monospace'),
                               ),
                             ),
                             IconButton(
@@ -402,8 +457,12 @@ class _BrowserViewState extends State<_BrowserView> {
           title: const Text('刪除確認'),
           content: Text('確定刪除 ${vm.selectedKeys.length} 個項目？'),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('取消')),
-            ElevatedButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('刪除')),
+            TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('取消')),
+            ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('刪除')),
           ],
         );
       },
@@ -413,7 +472,8 @@ class _BrowserViewState extends State<_BrowserView> {
     }
   }
 
-  Future<void> _copyOrMove(BuildContext context, BrowserViewModel vm, {required bool move}) async {
+  Future<void> _copyOrMove(BuildContext context, BrowserViewModel vm,
+      {required bool move}) async {
     if (vm.currentBucket == null) return;
     final bucketNotifier = ValueNotifier<String>(vm.currentBucket!);
     final prefixController = TextEditingController(text: vm.prefix);
@@ -426,8 +486,10 @@ class _BrowserViewState extends State<_BrowserView> {
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<String>(
-                value: bucketNotifier.value,
-                items: vm.buckets.map((b) => DropdownMenuItem(value: b, child: Text(b))).toList(),
+                initialValue: bucketNotifier.value,
+                items: vm.buckets
+                    .map((b) => DropdownMenuItem(value: b, child: Text(b)))
+                    .toList(),
                 onChanged: (value) {
                   if (value != null) bucketNotifier.value = value;
                 },
@@ -440,18 +502,24 @@ class _BrowserViewState extends State<_BrowserView> {
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('取消')),
-            ElevatedButton(onPressed: () => Navigator.of(context).pop(true), child: Text(move ? '移動' : '複製')),
+            TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('取消')),
+            ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: Text(move ? '移動' : '複製')),
           ],
         );
       },
     );
     if (confirmed == true) {
-      await vm.copySelection(bucketNotifier.value, prefixController.text, move: move);
+      await vm.copySelection(bucketNotifier.value, prefixController.text,
+          move: move);
     }
   }
 
-  Future<void> _handleDrop(BuildContext context, BrowserViewModel vm, DropDoneDetails details) async {
+  Future<void> _handleDrop(BuildContext context, BrowserViewModel vm,
+      DropDoneDetails details) async {
     final handler = DragDropHandler();
     final files = await handler.filesFromDrop(details);
     await vm.uploadFilesWithStructure(files);

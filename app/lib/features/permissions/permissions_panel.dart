@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../services/permissions_service.dart';
-import '../../services/s3_client.dart';
+
+import 'package:app/services/permissions_service.dart';
+import 'package:app/services/s3_client.dart';
 
 /// Permissions panel for managing ACL, Bucket Policy, and CORS
-/// 
+///
 /// Features:
 /// - View and edit Bucket/Object ACL
 /// - View and edit Bucket Policy (if supported by service)
@@ -12,12 +13,12 @@ import '../../services/s3_client.dart';
 /// - Grant/Revoke permissions with predefined ACL templates
 class PermissionsPanel extends StatefulWidget {
   final String bucket;
-  final String? key; // null for bucket-level permissions
+  final String? objectKey; // null for bucket-level permissions
 
   const PermissionsPanel({
     super.key,
     required this.bucket,
-    this.key,
+    this.objectKey,
   });
 
   @override
@@ -29,7 +30,7 @@ class _PermissionsPanelState extends State<PermissionsPanel>
   late TabController _tabController;
   late PermissionsService _permissionsService;
 
-  List<AclGrant>? _currentAcl;
+  AclResult? _currentAcl;
   String? _currentPolicy;
   CorsConfiguration? _currentCors;
   bool _isLoading = false;
@@ -40,7 +41,7 @@ class _PermissionsPanelState extends State<PermissionsPanel>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _permissionsService = PermissionsService(
-      context.read<S3Client>(),
+      client: context.read<S3Client>(),
     );
     _loadPermissions();
   }
@@ -58,22 +59,27 @@ class _PermissionsPanelState extends State<PermissionsPanel>
     });
 
     try {
-      if (widget.key == null) {
+      if (widget.objectKey == null) {
         // Bucket-level permissions
         final results = await Future.wait([
           _permissionsService.getBucketAcl(widget.bucket),
-          _permissionsService.getBucketPolicy(widget.bucket).catchError((_) => null),
-          _permissionsService.getCorsConfiguration(widget.bucket).catchError((_) => null),
+          _permissionsService
+              .getBucketPolicy(widget.bucket)
+              .catchError((_) => null),
+          _permissionsService
+              .getBucketCors(widget.bucket)
+              .catchError((_) => null),
         ]);
         setState(() {
-          _currentAcl = results[0] as List<AclGrant>;
+          _currentAcl = results[0] as AclResult;
           _currentPolicy = results[1] as String?;
           _currentCors = results[2] as CorsConfiguration?;
           _isLoading = false;
         });
       } else {
         // Object-level permissions (ACL only)
-        final acl = await _permissionsService.getObjectAcl(widget.bucket, widget.key!);
+        final acl = await _permissionsService.getObjectAcl(
+            widget.bucket, widget.objectKey!);
         setState(() {
           _currentAcl = acl;
           _isLoading = false;
@@ -90,10 +96,11 @@ class _PermissionsPanelState extends State<PermissionsPanel>
   Future<void> _applyAclTemplate(String template) async {
     setState(() => _isLoading = true);
     try {
-      if (widget.key == null) {
+      if (widget.objectKey == null) {
         await _permissionsService.setBucketAcl(widget.bucket, template);
       } else {
-        await _permissionsService.setObjectAcl(widget.bucket, widget.key!, template);
+        await _permissionsService.setObjectAcl(
+            widget.bucket, widget.objectKey!, template);
       }
       await _loadPermissions();
       if (mounted) {
@@ -110,7 +117,7 @@ class _PermissionsPanelState extends State<PermissionsPanel>
   }
 
   Future<void> _updatePolicy(String policy) async {
-    if (widget.key != null) return; // Policy only at bucket level
+    if (widget.objectKey != null) return; // Policy only at bucket level
 
     setState(() => _isLoading = true);
     try {
@@ -130,11 +137,14 @@ class _PermissionsPanelState extends State<PermissionsPanel>
   }
 
   Future<void> _updateCors(List<CorsRule> rules) async {
-    if (widget.key != null) return; // CORS only at bucket level
+    if (widget.objectKey != null) return; // CORS only at bucket level
 
     setState(() => _isLoading = true);
     try {
-      await _permissionsService.setCorsConfiguration(widget.bucket, rules);
+      await _permissionsService.setBucketCors(
+        widget.bucket,
+        CorsConfiguration(rules: rules),
+      );
       await _loadPermissions();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -152,7 +162,7 @@ class _PermissionsPanelState extends State<PermissionsPanel>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isObjectLevel = widget.key != null;
+    final isObjectLevel = widget.objectKey != null;
 
     return Scaffold(
       appBar: AppBar(
@@ -175,7 +185,8 @@ class _PermissionsPanelState extends State<PermissionsPanel>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.error, size: 64, color: theme.colorScheme.error),
+                      Icon(Icons.error,
+                          size: 64, color: theme.colorScheme.error),
                       const SizedBox(height: 16),
                       Text(_error!, style: theme.textTheme.bodyLarge),
                       const SizedBox(height: 16),
@@ -223,8 +234,7 @@ class _PermissionsPanelState extends State<PermissionsPanel>
                     children: [
                       _buildAclTemplateButton('private', '私有'),
                       _buildAclTemplateButton('public-read', '公開讀取'),
-                      _buildAclTemplateButton('public-read-write', '公開讀寫'),
-                      if (widget.key == null) ...[
+                      if (widget.objectKey == null) ...[
                         _buildAclTemplateButton('authenticated-read', '已驗證讀取'),
                         _buildAclTemplateButton('log-delivery-write', '日誌寫入'),
                       ],
@@ -247,12 +257,12 @@ class _PermissionsPanelState extends State<PermissionsPanel>
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 12),
-                  if (_currentAcl == null || _currentAcl!.isEmpty)
+                  if (_currentAcl == null || _currentAcl!.grants.isEmpty)
                     const Text('無授權記錄（或服務不支援 ACL 讀取）')
                   else
-                    ..._currentAcl!.map((grant) => ListTile(
+                    ..._currentAcl!.grants.map((grant) => ListTile(
                           leading: Icon(_getPermissionIcon(grant.permission)),
-                          title: Text(_formatGranteeName(grant.grantee)),
+                          title: Text(grant.grantee),
                           subtitle: Text(_formatPermission(grant.permission)),
                           dense: true,
                         )),
@@ -313,7 +323,8 @@ class _PermissionsPanelState extends State<PermissionsPanel>
                       ),
                       child: SelectableText(
                         _currentPolicy!,
-                        style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                        style: const TextStyle(
+                            fontFamily: 'monospace', fontSize: 12),
                       ),
                     ),
                 ],
@@ -477,9 +488,18 @@ class _PermissionsPanelState extends State<PermissionsPanel>
           ElevatedButton(
             onPressed: () {
               final newRule = CorsRule(
-                allowedOrigins: originController.text.split(',').map((e) => e.trim()).toList(),
-                allowedMethods: methodsController.text.split(',').map((e) => e.trim()).toList(),
-                allowedHeaders: headersController.text.split(',').map((e) => e.trim()).toList(),
+                allowedOrigins: originController.text
+                    .split(',')
+                    .map((e) => e.trim())
+                    .toList(),
+                allowedMethods: methodsController.text
+                    .split(',')
+                    .map((e) => e.trim())
+                    .toList(),
+                allowedHeaders: headersController.text
+                    .split(',')
+                    .map((e) => e.trim())
+                    .toList(),
                 maxAgeSeconds: int.tryParse(maxAgeController.text),
               );
               final updatedRules = [...?_currentCors?.rules, newRule];
@@ -495,54 +515,38 @@ class _PermissionsPanelState extends State<PermissionsPanel>
 
   void _deleteCorsRule(int index) {
     if (_currentCors == null) return;
-    final updatedRules = List<CorsRule>.from(_currentCors!.rules)..removeAt(index);
+    final updatedRules = List<CorsRule>.from(_currentCors!.rules)
+      ..removeAt(index);
     _updateCors(updatedRules);
   }
 
-  IconData _getPermissionIcon(String permission) {
-    switch (permission.toUpperCase()) {
-      case 'FULL_CONTROL':
+  IconData _getPermissionIcon(AclPermission permission) {
+    switch (permission) {
+      case AclPermission.fullControl:
         return Icons.admin_panel_settings;
-      case 'READ':
+      case AclPermission.read:
         return Icons.visibility;
-      case 'WRITE':
+      case AclPermission.write:
         return Icons.edit;
-      case 'READ_ACP':
+      case AclPermission.readAcp:
         return Icons.policy;
-      case 'WRITE_ACP':
+      case AclPermission.writeAcp:
         return Icons.security;
-      default:
-        return Icons.help_outline;
     }
   }
 
-  String _formatGranteeName(Grantee grantee) {
-    if (grantee.displayName?.isNotEmpty == true) {
-      return grantee.displayName!;
-    }
-    if (grantee.id?.isNotEmpty == true) {
-      return grantee.id!;
-    }
-    if (grantee.uri?.isNotEmpty == true) {
-      return grantee.uri!.split('/').last;
-    }
-    return '未知使用者';
-  }
-
-  String _formatPermission(String permission) {
-    switch (permission.toUpperCase()) {
-      case 'FULL_CONTROL':
+  String _formatPermission(AclPermission permission) {
+    switch (permission) {
+      case AclPermission.fullControl:
         return '完全控制';
-      case 'READ':
+      case AclPermission.read:
         return '讀取';
-      case 'WRITE':
+      case AclPermission.write:
         return '寫入';
-      case 'READ_ACP':
+      case AclPermission.readAcp:
         return '讀取 ACL';
-      case 'WRITE_ACP':
+      case AclPermission.writeAcp:
         return '寫入 ACL';
-      default:
-        return permission;
     }
   }
 }

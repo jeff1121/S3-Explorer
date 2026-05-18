@@ -16,7 +16,6 @@ class NowUITheme {
       seedColor: primary,
       primary: primary,
       secondary: accent,
-      background: background,
       surface: surface,
     ),
     scaffoldBackgroundColor: background,

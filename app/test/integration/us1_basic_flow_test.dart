@@ -26,7 +26,9 @@ void main() {
   if (missing.isNotEmpty) {
     test('US1 basic flow (skipped)', () {
       expect(true, isTrue);
-    }, skip: 'Set env vars: ${missing.join(', ')} to run integration against S3/MinIO');
+    },
+        skip:
+            'Set env vars: ${missing.join(', ')} to run integration against S3/MinIO');
     return;
   }
 
@@ -59,7 +61,7 @@ void main() {
       final bucketName = bucket!.toLowerCase().replaceAll('_', '-');
       final buckets = await service.listBuckets();
       print('Available buckets: $buckets');
-      
+
       // Create bucket if it doesn't exist
       if (!buckets.contains(bucketName)) {
         print('Bucket $bucketName not found, creating...');
@@ -79,7 +81,8 @@ void main() {
       await queue.waitFor(uploadTask.id).timeout(const Duration(seconds: 15));
 
       final downloadPath = p.join(tempDir.path, 'download.txt');
-      final downloadTask = await service.download(bucketName, key, downloadPath);
+      final downloadTask =
+          await service.download(bucketName, key, downloadPath);
       await queue.waitFor(downloadTask.id).timeout(const Duration(seconds: 15));
 
       final downloaded = await File(downloadPath).readAsString();
@@ -90,3 +93,4 @@ void main() {
     });
   });
 }
+// ignore_for_file: avoid_print
