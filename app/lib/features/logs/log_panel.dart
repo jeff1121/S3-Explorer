@@ -60,7 +60,8 @@ class LogManager extends ChangeNotifier {
 
   List<LogMessage> get messages => List.unmodifiable(_messages);
 
-  void addLog(LogLevel level, String message, {String? source, String? details}) {
+  void addLog(LogLevel level, String message,
+      {String? source, String? details}) {
     final log = LogMessage(
       timestamp: DateTime.now(),
       level: level,
@@ -103,12 +104,14 @@ class LogManager extends ChangeNotifier {
     return _messages.where((m) => m.level == level).toList();
   }
 
-  int get errorCount => _messages.where((m) => m.level == LogLevel.error).length;
-  int get warningCount => _messages.where((m) => m.level == LogLevel.warning).length;
+  int get errorCount =>
+      _messages.where((m) => m.level == LogLevel.error).length;
+  int get warningCount =>
+      _messages.where((m) => m.level == LogLevel.warning).length;
 }
 
 /// Consolidated log and error display panel
-/// 
+///
 /// Features:
 /// - View all logs in chronological order
 /// - Filter by log level (debug, info, warning, error)
@@ -193,7 +196,8 @@ class _LogPanelState extends State<LogPanel> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Chip(
-                avatar: const Icon(Icons.warning, size: 16, color: Colors.white),
+                avatar:
+                    const Icon(Icons.warning, size: 16, color: Colors.white),
                 label: Text('${widget.logManager.warningCount}'),
                 backgroundColor: Colors.orange,
                 labelStyle: const TextStyle(color: Colors.white, fontSize: 12),
@@ -252,7 +256,8 @@ class _LogPanelState extends State<LogPanel> {
                       avatar: const Icon(Icons.bug_report, size: 16),
                       selected: _filterLevel == LogLevel.debug,
                       onSelected: (selected) {
-                        setState(() => _filterLevel = selected ? LogLevel.debug : null);
+                        setState(() =>
+                            _filterLevel = selected ? LogLevel.debug : null);
                       },
                     ),
                     FilterChip(
@@ -260,7 +265,8 @@ class _LogPanelState extends State<LogPanel> {
                       avatar: const Icon(Icons.info, size: 16),
                       selected: _filterLevel == LogLevel.info,
                       onSelected: (selected) {
-                        setState(() => _filterLevel = selected ? LogLevel.info : null);
+                        setState(() =>
+                            _filterLevel = selected ? LogLevel.info : null);
                       },
                     ),
                     FilterChip(
@@ -268,7 +274,8 @@ class _LogPanelState extends State<LogPanel> {
                       avatar: const Icon(Icons.warning, size: 16),
                       selected: _filterLevel == LogLevel.warning,
                       onSelected: (selected) {
-                        setState(() => _filterLevel = selected ? LogLevel.warning : null);
+                        setState(() =>
+                            _filterLevel = selected ? LogLevel.warning : null);
                       },
                     ),
                     FilterChip(
@@ -276,7 +283,8 @@ class _LogPanelState extends State<LogPanel> {
                       avatar: const Icon(Icons.error, size: 16),
                       selected: _filterLevel == LogLevel.error,
                       onSelected: (selected) {
-                        setState(() => _filterLevel = selected ? LogLevel.error : null);
+                        setState(() =>
+                            _filterLevel = selected ? LogLevel.error : null);
                       },
                     ),
                   ],
@@ -288,7 +296,8 @@ class _LogPanelState extends State<LogPanel> {
                     hintText: '搜尋日誌內容...',
                     prefixIcon: Icon(Icons.search),
                     border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   ),
                   onChanged: (value) {
                     setState(() => _searchQuery = value);
@@ -354,7 +363,8 @@ class _LogPanelState extends State<LogPanel> {
             if (message.source != null) ...[
               const SizedBox(width: 8),
               Chip(
-                label: Text(message.source!, style: const TextStyle(fontSize: 10)),
+                label:
+                    Text(message.source!, style: const TextStyle(fontSize: 10)),
                 visualDensity: VisualDensity.compact,
               ),
             ],
@@ -393,9 +403,8 @@ class _LogPanelState extends State<LogPanel> {
             ],
           ],
         ),
-        onTap: message.details != null
-            ? () => _showDetailDialog(message)
-            : null,
+        onTap:
+            message.details != null ? () => _showDetailDialog(message) : null,
       ),
     );
   }

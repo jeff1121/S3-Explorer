@@ -1,11 +1,12 @@
 import 'dart:io';
 import 'package:desktop_drop/desktop_drop.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
 class FileUploadInfo {
   final String localPath;
   final String relativePath;
-  
+
   FileUploadInfo({required this.localPath, required this.relativePath});
 }
 
@@ -13,11 +14,11 @@ class FileUploadInfo {
 class DragDropHandler {
   Future<List<FileUploadInfo>> filesFromDrop(DropDoneDetails details) async {
     final allFiles = <FileUploadInfo>[];
-    
+
     for (final file in details.files) {
       final path = file.path;
       if (path.isEmpty) continue;
-      
+
       final entity = FileSystemEntity.typeSync(path);
       if (entity == FileSystemEntityType.directory) {
         // Recursively collect all files in the directory
@@ -33,17 +34,19 @@ class DragDropHandler {
     }
     return allFiles;
   }
-  
+
   Future<List<FileUploadInfo>> _collectFilesInDirectory(String dirPath) async {
     final files = <FileUploadInfo>[];
     final dir = Directory(dirPath);
     final dirName = p.basename(dirPath);
-    
+
     try {
-      await for (final entity in dir.list(recursive: true, followLinks: false)) {
+      await for (final entity
+          in dir.list(recursive: true, followLinks: false)) {
         if (entity is File) {
           // Calculate relative path from the dragged directory
-          final relativePath = p.join(dirName, p.relative(entity.path, from: dirPath));
+          final relativePath =
+              p.join(dirName, p.relative(entity.path, from: dirPath));
           files.add(FileUploadInfo(
             localPath: entity.path,
             relativePath: relativePath,
@@ -51,12 +54,12 @@ class DragDropHandler {
         }
       }
     } catch (e) {
-      print('Warning: Failed to read directory $dirPath: $e');
+      debugPrint('Warning: Failed to read directory $dirPath: $e');
     }
-    
+
     return files;
   }
-  
+
   // Legacy method for backward compatibility
   Future<List<String>> pathsFromDrop(DropDoneDetails details) async {
     final files = await filesFromDrop(details);

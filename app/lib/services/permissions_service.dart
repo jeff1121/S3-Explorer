@@ -64,7 +64,8 @@ class Grant {
   final AclPermission permission;
 
   @override
-  String toString() => 'Grant($grantee, $granteeType, ${permission.toS3String()})';
+  String toString() =>
+      'Grant($grantee, $granteeType, ${permission.toS3String()})';
 }
 
 /// ACL result for a bucket or object
@@ -95,7 +96,10 @@ class CorsConfiguration {
 
   static CorsConfiguration fromJson(Map<String, dynamic> json) {
     return CorsConfiguration(
-      rules: (json['rules'] as List<dynamic>?)?.map((r) => CorsRule.fromJson(r as Map<String, dynamic>)).toList() ?? [],
+      rules: (json['rules'] as List<dynamic>?)
+              ?.map((r) => CorsRule.fromJson(r as Map<String, dynamic>))
+              .toList() ??
+          [],
     );
   }
 }
@@ -127,7 +131,8 @@ class CorsRule {
     return CorsRule(
       allowedOrigins: (json['allowedOrigins'] as List<dynamic>).cast<String>(),
       allowedMethods: (json['allowedMethods'] as List<dynamic>).cast<String>(),
-      allowedHeaders: (json['allowedHeaders'] as List<dynamic>?)?.cast<String>(),
+      allowedHeaders:
+          (json['allowedHeaders'] as List<dynamic>?)?.cast<String>(),
       exposeHeaders: (json['exposeHeaders'] as List<dynamic>?)?.cast<String>(),
       maxAgeSeconds: json['maxAgeSeconds'] as int?,
     );
@@ -146,12 +151,15 @@ class PermissionsService {
       final result = await client.raw.getBucketAcl(bucket: bucket);
       final owner = result.owner?.id ?? 'unknown';
       final grants = (result.grants ?? []).map((g) {
-        final grantee = g.grantee?.id ?? g.grantee?.uri ?? g.grantee?.emailAddress ?? 'unknown';
+        final grantee = g.grantee?.id ??
+            g.grantee?.uri ??
+            g.grantee?.emailAddress ??
+            'unknown';
         final permissionValue = g.permission?.value ?? 'READ';
         final permission = AclPermissionExt.fromS3String(permissionValue);
         return Grant(
           grantee: grantee,
-          granteeType: _mapGranteeType(g.grantee?.type?.value),
+          granteeType: _mapGranteeType(g.grantee?.type.value),
           permission: permission,
         );
       }).toList();
@@ -167,12 +175,15 @@ class PermissionsService {
       final result = await client.raw.getObjectAcl(bucket: bucket, key: key);
       final owner = result.owner?.id ?? 'unknown';
       final grants = (result.grants ?? []).map((g) {
-        final grantee = g.grantee?.id ?? g.grantee?.uri ?? g.grantee?.emailAddress ?? 'unknown';
+        final grantee = g.grantee?.id ??
+            g.grantee?.uri ??
+            g.grantee?.emailAddress ??
+            'unknown';
         final permissionValue = g.permission?.value ?? 'READ';
         final permission = AclPermissionExt.fromS3String(permissionValue);
         return Grant(
           grantee: grantee,
-          granteeType: _mapGranteeType(g.grantee?.type?.value),
+          granteeType: _mapGranteeType(g.grantee?.type.value),
           permission: permission,
         );
       }).toList();
@@ -250,8 +261,8 @@ class PermissionsService {
       final result = await client.raw.getBucketCors(bucket: bucket);
       final rules = (result.cORSRules ?? []).map((r) {
         return CorsRule(
-          allowedOrigins: r.allowedOrigins ?? [],
-          allowedMethods: r.allowedMethods ?? [],
+          allowedOrigins: r.allowedOrigins,
+          allowedMethods: r.allowedMethods,
           allowedHeaders: r.allowedHeaders,
           exposeHeaders: r.exposeHeaders,
           maxAgeSeconds: r.maxAgeSeconds,

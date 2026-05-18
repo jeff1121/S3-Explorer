@@ -28,7 +28,9 @@ void main() {
   if (missing.isNotEmpty) {
     test('US2 queue and preview (skipped)', () {
       expect(true, isTrue);
-    }, skip: 'Set env vars: ${missing.join(', ')} to run integration against S3/MinIO');
+    },
+        skip:
+            'Set env vars: ${missing.join(', ')} to run integration against S3/MinIO');
     return;
   }
 
@@ -63,7 +65,7 @@ void main() {
     test('multipart upload', () async {
       final bucketName = bucket!.toLowerCase().replaceAll('_', '-');
       final buckets = await service.listBuckets();
-      
+
       // Only create if missing
       if (!buckets.contains(bucketName)) {
         try {
@@ -75,31 +77,34 @@ void main() {
       }
 
       final tempDir = await Directory.systemTemp.createTemp('s3-desktop-us2-');
-      
+
       // Create a 10MB file for multipart upload test (>5MB threshold)
       final largeFile = File(p.join(tempDir.path, 'large.dat'));
       final chunkSize = 1024 * 1024; // 1MB chunks
       final totalSize = 10 * chunkSize;
       final data = Uint8List(chunkSize);
-      
+
       final sink = largeFile.openWrite();
       for (var i = 0; i < 10; i++) {
         sink.add(data);
       }
       await sink.close();
-      
+
       expect(await largeFile.length(), equals(totalSize));
 
       final key = 'desktop-us2/${const Uuid().v4()}.dat';
       final uploadTask = await service.upload(bucketName, key, largeFile.path);
-      
+
       // Wait for completion
-      final completedTask = await queue.waitFor(uploadTask.id).timeout(const Duration(seconds: 60));
-      
+      final completedTask = await queue
+          .waitFor(uploadTask.id)
+          .timeout(const Duration(seconds: 60));
+
       expect(completedTask.status, equals(TransferStatus.completed));
 
       // Verify upload
-      final objects = await service.listObjects(bucketName, prefix: 'desktop-us2/');
+      final objects =
+          await service.listObjects(bucketName, prefix: 'desktop-us2/');
       expect(objects.any((o) => o.key == key), isTrue);
 
       // Cleanup - delete from S3 first, wait for queue to settle, then delete local
@@ -111,7 +116,7 @@ void main() {
     test('preview text file', () async {
       final bucketName = bucket!.toLowerCase().replaceAll('_', '-');
       final buckets = await service.listBuckets();
-      
+
       // Only create if missing
       if (!buckets.contains(bucketName)) {
         try {
@@ -121,10 +126,12 @@ void main() {
         }
       }
 
-      final tempDir = await Directory.systemTemp.createTemp('s3-desktop-us2-preview-');
-      
+      final tempDir =
+          await Directory.systemTemp.createTemp('s3-desktop-us2-preview-');
+
       // Create a text file
-      final textContent = 'This is a test file for preview.\nLine 2\nLine 3\n' * 50;
+      final textContent =
+          'This is a test file for preview.\nLine 2\nLine 3\n' * 50;
       final textFile = File(p.join(tempDir.path, 'preview.txt'));
       await textFile.writeAsString(textContent);
 
@@ -147,7 +154,7 @@ void main() {
     test('concurrent upload queue control', () async {
       final bucketName = bucket!.toLowerCase().replaceAll('_', '-');
       final buckets = await service.listBuckets();
-      
+
       // Only create if missing
       if (!buckets.contains(bucketName)) {
         try {
@@ -157,8 +164,9 @@ void main() {
         }
       }
 
-      final tempDir = await Directory.systemTemp.createTemp('s3-desktop-us2-concurrent-');
-      
+      final tempDir =
+          await Directory.systemTemp.createTemp('s3-desktop-us2-concurrent-');
+
       // Create 5 small files
       final files = <File>[];
       final keys = <String>[];
@@ -166,7 +174,7 @@ void main() {
         final file = File(p.join(tempDir.path, 'file_$i.txt'));
         await file.writeAsString('Content $i\n' * 100);
         files.add(file);
-        
+
         final key = 'desktop-us2-concurrent/${const Uuid().v4()}_$i.txt';
         keys.add(key);
       }
@@ -183,7 +191,8 @@ void main() {
 
       // Wait for all to complete
       await Future.wait(
-        uploadTasks.map((t) => queue.waitFor(t.id).timeout(const Duration(seconds: 30))),
+        uploadTasks.map(
+            (t) => queue.waitFor(t.id).timeout(const Duration(seconds: 30))),
       );
 
       // Verify all completed

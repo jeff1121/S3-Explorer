@@ -5,7 +5,8 @@ import 'package:app/models/entities.dart';
 import 'package:uuid/uuid.dart';
 
 class ProfileStorage {
-  ProfileStorage({Directory? homeDir}) : _homeDir = homeDir ?? Directory('${_userHome()}/.config/s3_desktop');
+  ProfileStorage({Directory? homeDir})
+      : _homeDir = homeDir ?? Directory('${_userHome()}/.config/s3_desktop');
 
   final Directory _homeDir;
   final _uuid = const Uuid();
@@ -71,7 +72,8 @@ class ProfileStorage {
       concurrency: (json['concurrency'] as num?)?.toInt() ?? 3,
       partSizeMb: (json['partSizeMb'] as num?)?.toInt() ?? 8,
       retryPolicy: RetryPolicy(
-        maxAttempts: (json['retryPolicy']?['maxAttempts'] as num?)?.toInt() ?? 3,
+        maxAttempts:
+            (json['retryPolicy']?['maxAttempts'] as num?)?.toInt() ?? 3,
         backoffMs: (json['retryPolicy']?['backoffMs'] as num?)?.toInt() ?? 500,
       ),
     );

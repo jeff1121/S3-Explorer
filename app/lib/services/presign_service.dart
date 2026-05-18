@@ -1,5 +1,5 @@
 import 'package:app/services/s3_client.dart';
-import 'package:aws_client/s3_2006_03_01.dart' as aws;
+import 'package:app/services/sigv4_presigner.dart';
 
 /// Presigned URL action types
 enum PresignAction {
@@ -43,23 +43,28 @@ class PresignService {
   final S3Client client;
 
   /// Generate presigned URL
-  /// 
-  /// Note: aws_client does not provide built-in presigned URL generation.
-  /// This is a simplified implementation that returns the S3 object URL.
-  /// For production use, consider implementing proper SigV4 presigning.
+  ///
+  /// Uses AWS Signature Version 4 query signing for S3-compatible endpoints.
   Future<PresignResult> generatePresignedUrl(PresignRequest request) async {
     if (request.expiresInSeconds < 60 || request.expiresInSeconds > 604800) {
-      throw ArgumentError('expiresInSeconds must be between 60 and 604800 (7 days)');
+      throw ArgumentError(
+          'expiresInSeconds must be between 60 and 604800 (7 days)');
     }
 
-    final endpoint = client.profile.endpoint.toString().replaceAll(RegExp(r'/$'), '');
-    final url = '$endpoint/${request.bucket}/${request.key}';
-
-    // TODO: Implement actual SigV4 presigning
-    // For now, return a simple URL with expiration timestamp
-    // In production, this should generate proper AWS SigV4 signed URLs
-    
-    final expiresAt = DateTime.now().add(Duration(seconds: request.expiresInSeconds));
+    final expiresAt =
+        DateTime.now().add(Duration(seconds: request.expiresInSeconds));
+    final presigner = SigV4Presigner(
+      endpoint: client.profile.endpoint,
+      region: client.profile.region,
+      accessKeyId: client.profile.accessKeyId,
+      secretKey: client.profile.secretKey,
+    );
+    final url = presigner.presign(
+      method: request.action == PresignAction.get ? 'GET' : 'PUT',
+      bucket: request.bucket,
+      key: request.key,
+      expiresIn: Duration(seconds: request.expiresInSeconds),
+    );
 
     return PresignResult(
       url: url,

@@ -130,7 +130,7 @@ Now UI Pro Flutter 資源已整合：
 
 ### 連線設定檔
 - 儲存位置：`~/Library/Application Support/<app>/profiles.json`
-- macOS Keychain 整合：TODO（目前使用加密 JSON）
+- macOS Keychain 整合：TODO（目前使用 JSON）
 - ⚠️ 開發階段 secret key 以明文儲存，生產環境需使用 Keychain
 
 ### 書籤
@@ -139,15 +139,12 @@ Now UI Pro Flutter 資源已整合：
 ## 9) 已知問題
 
 - ⚠️ US2 multipart upload 測試有檔案存取衝突（FileSystemException），功能本身正常但測試需要修復
-- ⚠️ 預簽 URL 目前為簡化實作，未實作完整 SigV4 簽名（TODO）
-- ⚠️ UI 層面板（權限、同步）尚未實作，服務層已完成
+- ⚠️ Keychain 整合尚未完成，目前 profile credentials 仍存於本機 JSON
 
 ## 10) 後續延伸
 
 - Windows 打包與測試為後續發佈
 - macOS 打包腳本與簽章（T037）
-- 完整 UI 面板（權限、同步、書籤）
+- Keychain 憑證儲存與既有 JSON profile 遷移
 - 完整 US3 整合測試
-- 生產級 SigV4 預簽 URL
 - 完整錯誤/日誌 UI 整合
-

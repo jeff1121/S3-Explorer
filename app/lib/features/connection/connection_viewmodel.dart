@@ -5,7 +5,8 @@ import 'package:app/services/s3_client.dart';
 import 'package:flutter/foundation.dart';
 
 class ConnectionViewModel extends ChangeNotifier {
-  ConnectionViewModel({required ProfileStorage storage, required AppLogger logger})
+  ConnectionViewModel(
+      {required ProfileStorage storage, required AppLogger logger})
       : _storage = storage,
         _logger = logger;
 
@@ -115,7 +116,8 @@ class ConnectionViewModel extends ChangeNotifier {
       defaultPrefix: defaultPrefix.isEmpty ? null : defaultPrefix.trim(),
       concurrency: concurrency,
       partSizeMb: partSizeMb,
-      retryPolicy: RetryPolicy(maxAttempts: retryMaxAttempts, backoffMs: retryBackoffMs),
+      retryPolicy:
+          RetryPolicy(maxAttempts: retryMaxAttempts, backoffMs: retryBackoffMs),
     );
   }
 
@@ -167,7 +169,8 @@ class ConnectionViewModel extends ChangeNotifier {
   }
 
   void select(String id) {
-    selected = profiles.firstWhere((p) => p.id == id, orElse: () => selected ?? profiles.first);
+    selected = profiles.firstWhere((p) => p.id == id,
+        orElse: () => selected ?? profiles.first);
     if (selected != null) {
       _applyProfile(selected!);
     }

@@ -42,7 +42,7 @@ class MultipartUploader {
   MultipartUploader({required this.client, this.maxConcurrent = 3});
 
   final S3Client client;
-  
+
   /// Maximum number of parts that can be uploaded concurrently.
   /// Default: 3. Recommended range: 1-10.
   final int maxConcurrent;
@@ -63,7 +63,8 @@ class MultipartUploader {
     final partCount = (totalBytes / partSize).ceil();
     final opened = await file.open();
 
-    final createResp = await client.raw.createMultipartUpload(bucket: bucket, key: key);
+    final createResp =
+        await client.raw.createMultipartUpload(bucket: bucket, key: key);
     final uploadId = createResp.uploadId;
     if (uploadId == null) {
       await opened.close();
@@ -88,7 +89,8 @@ class MultipartUploader {
         partNumber: partNumber,
         body: bytes,
       );
-      completedParts.add(aws.CompletedPart(eTag: resp.eTag, partNumber: partNumber));
+      completedParts
+          .add(aws.CompletedPart(eTag: resp.eTag, partNumber: partNumber));
       partsCompleted += 1;
       control.reportProgress(TransferProgress(
         bytesTransferred: min(totalBytes, partNumber * partSize),
@@ -120,7 +122,8 @@ class MultipartUploader {
       }
       await Future.wait(workers);
 
-      completedParts.sort((a, b) => (a.partNumber ?? 0).compareTo(b.partNumber ?? 0));
+      completedParts
+          .sort((a, b) => (a.partNumber ?? 0).compareTo(b.partNumber ?? 0));
       await client.raw.completeMultipartUpload(
         bucket: bucket,
         key: key,
@@ -129,7 +132,8 @@ class MultipartUploader {
       );
     } catch (e) {
       if (!control.isCanceled) {
-        await client.raw.abortMultipartUpload(bucket: bucket, key: key, uploadId: uploadId);
+        await client.raw
+            .abortMultipartUpload(bucket: bucket, key: key, uploadId: uploadId);
       }
       rethrow;
     } finally {

@@ -9,15 +9,15 @@ import 'package:uuid/uuid.dart';
 
 /// Sync mode
 enum SyncMode {
-  oneWay,   // Source to target only
-  mirror,   // Source to target with deletion of extra files
+  oneWay, // Source to target only
+  mirror, // Source to target with deletion of extra files
 }
 
 /// Conflict policy when file exists
 enum ConflictPolicy {
-  overwrite,  // Overwrite target
-  skip,       // Skip if exists
-  keepBoth,   // Keep both (rename new)
+  overwrite, // Overwrite target
+  skip, // Skip if exists
+  keepBoth, // Keep both (rename new)
 }
 
 /// Sync job configuration
@@ -81,7 +81,8 @@ class SyncJob {
   }
 
   @override
-  String toString() => 'SyncJob($name, $status, $filesTransferred/$filesScanned files)';
+  String toString() =>
+      'SyncJob($name, $status, $filesTransferred/$filesScanned files)';
 }
 
 /// Sync operation summary
@@ -119,7 +120,8 @@ class SyncSummary {
 
 /// Service for syncing/mirroring between S3 locations
 class SyncService with ChangeNotifier {
-  SyncService({required this.objectService, required this.client, required this.queue});
+  SyncService(
+      {required this.objectService, required this.client, required this.queue});
 
   final ObjectService objectService;
   final S3Client client;
@@ -158,12 +160,9 @@ class SyncService with ChangeNotifier {
 
   Future<void> _executeSync(SyncJob job) async {
     try {
-      final startTime = DateTime.now();
       int filesScanned = 0;
       int filesAdded = 0;
       int filesUpdated = 0;
-      int filesDeleted = 0;
-      int filesSkipped = 0;
       int bytesTransferred = 0;
       final errors = <String>[];
 
@@ -187,8 +186,12 @@ class SyncService with ChangeNotifier {
 
       // Process each source object
       for (final sourceObj in sourceObjects) {
-        final relativeKey = job.source.key != null ? sourceObj.key.substring(job.source.key!.length) : sourceObj.key;
-        final targetKey = job.target.key != null ? '${job.target.key}$relativeKey' : relativeKey;
+        final relativeKey = job.source.key != null
+            ? sourceObj.key.substring(job.source.key!.length)
+            : sourceObj.key;
+        final targetKey = job.target.key != null
+            ? '${job.target.key}$relativeKey'
+            : relativeKey;
 
         final targetObj = targetKeys.remove(targetKey);
 
@@ -210,7 +213,8 @@ class SyncService with ChangeNotifier {
           // File exists in target
           if (job.conflictPolicy == ConflictPolicy.overwrite) {
             // Check if source is newer or different size
-            if (sourceObj.lastModified.isAfter(targetObj.lastModified) || sourceObj.sizeBytes != targetObj.sizeBytes) {
+            if (sourceObj.lastModified.isAfter(targetObj.lastModified) ||
+                sourceObj.sizeBytes != targetObj.sizeBytes) {
               try {
                 await objectService.copy(
                   job.source.bucket!,
@@ -224,10 +228,10 @@ class SyncService with ChangeNotifier {
                 errors.add('更新 $targetKey 失敗: $e');
               }
             } else {
-              filesSkipped++;
+              continue;
             }
           } else {
-            filesSkipped++;
+            continue;
           }
         }
       }
@@ -235,8 +239,8 @@ class SyncService with ChangeNotifier {
       // If mirror mode, delete files that exist in target but not in source
       if (job.mode == SyncMode.mirror && targetKeys.isNotEmpty) {
         try {
-          await objectService.deleteObjects(job.target.bucket!, targetKeys.keys.toList());
-          filesDeleted = targetKeys.length;
+          await objectService.deleteObjects(
+              job.target.bucket!, targetKeys.keys.toList());
         } catch (e) {
           errors.add('刪除多餘檔案失敗: $e');
         }

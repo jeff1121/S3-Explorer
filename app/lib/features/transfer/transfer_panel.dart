@@ -13,20 +13,30 @@ class TransferPanel extends StatelessWidget {
     if (tasks.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.grey.shade200)),
+        decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade200)),
         child: const Text('目前沒有傳輸任務'),
       );
     }
     return Container(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.grey.shade200)),
+      decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey.shade200)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text('傳輸佇列'),
           const SizedBox(height: 8),
           ...tasks.map((t) {
-            final progress = t.progress.totalBytes == 0 ? null : (t.progress.bytesTransferred / t.progress.totalBytes).clamp(0.0, 1.0).toDouble();
+            final progress = t.progress.totalBytes == 0
+                ? null
+                : (t.progress.bytesTransferred / t.progress.totalBytes)
+                    .clamp(0.0, 1.0)
+                    .toDouble();
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(
@@ -42,7 +52,9 @@ class TransferPanel extends StatelessWidget {
                   const SizedBox(width: 8),
                   Text(t.status.name),
                   IconButton(
-                    icon: Icon(t.status == TransferStatus.paused ? Icons.play_arrow : Icons.pause),
+                    icon: Icon(t.status == TransferStatus.paused
+                        ? Icons.play_arrow
+                        : Icons.pause),
                     tooltip: t.status == TransferStatus.paused ? '繼續' : '暫停',
                     onPressed: () {
                       if (t.status == TransferStatus.paused) {

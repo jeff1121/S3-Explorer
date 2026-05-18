@@ -6,7 +6,13 @@ import 'package:app/services/s3_client.dart';
 enum PreviewType { text, image, unsupported }
 
 class PreviewResult {
-  PreviewResult({required this.type, required this.contentType, required this.contentLength, this.text, this.bytes, this.error});
+  PreviewResult(
+      {required this.type,
+      required this.contentType,
+      required this.contentLength,
+      this.text,
+      this.bytes,
+      this.error});
 
   final PreviewType type;
   final String contentType;
@@ -35,14 +41,30 @@ class PreviewService {
 
       if (contentType.startsWith('text/') || contentType.contains('json')) {
         final text = utf8.decode(data, allowMalformed: true);
-        return PreviewResult(type: PreviewType.text, contentType: contentType, contentLength: length, text: text);
+        return PreviewResult(
+            type: PreviewType.text,
+            contentType: contentType,
+            contentLength: length,
+            text: text);
       }
       if (contentType.startsWith('image/')) {
-        return PreviewResult(type: PreviewType.image, contentType: contentType, contentLength: length, bytes: data);
+        return PreviewResult(
+            type: PreviewType.image,
+            contentType: contentType,
+            contentLength: length,
+            bytes: data);
       }
-      return PreviewResult(type: PreviewType.unsupported, contentType: contentType, contentLength: length, error: '不支援的格式');
+      return PreviewResult(
+          type: PreviewType.unsupported,
+          contentType: contentType,
+          contentLength: length,
+          error: '不支援的格式');
     } catch (e) {
-      return PreviewResult(type: PreviewType.unsupported, contentType: 'unknown', contentLength: 0, error: e.toString());
+      return PreviewResult(
+          type: PreviewType.unsupported,
+          contentType: 'unknown',
+          contentLength: 0,
+          error: e.toString());
     }
   }
 }

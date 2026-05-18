@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:app/models/entities.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -46,7 +45,8 @@ class Bookmark {
   }
 
   @override
-  String toString() => 'Bookmark($name, $bucket${prefix != null ? "/$prefix" : ""})';
+  String toString() =>
+      'Bookmark($name, $bucket${prefix != null ? "/$prefix" : ""})';
 }
 
 /// Service for managing bookmarks
@@ -78,7 +78,8 @@ class BookmarksService with ChangeNotifier {
       final content = await _storageFile!.readAsString();
       final json = jsonDecode(content) as List<dynamic>;
       _bookmarks.clear();
-      _bookmarks.addAll(json.map((item) => Bookmark.fromJson(item as Map<String, dynamic>)));
+      _bookmarks.addAll(
+          json.map((item) => Bookmark.fromJson(item as Map<String, dynamic>)));
       notifyListeners();
     } catch (e) {
       debugPrint('Failed to load bookmarks: $e');

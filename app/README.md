@@ -26,7 +26,7 @@ Flutter 基礎的 macOS 桌面應用程式，用於管理 S3/S3 相容儲存服�
 - ✅ ACL 管理（Bucket/Object 層級）
 - ✅ Bucket Policy 管理
 - ✅ CORS 配置
-- ✅ 預簽 URL 生成（簡化版，待完整 SigV4）
+- ✅ 預簽 URL 生成（SigV4 query signing）
 - ✅ 同步/鏡像服務（單向/鏡像模式，衝突策略）
 - ✅ 書籤快速存取
 - ⚠️ UI 面板待實作
@@ -55,8 +55,8 @@ flutter test
 # 4. 執行整合測試（需要 MinIO 環境）
 export TEST_S3_ENDPOINT="http://10.36.225.8:8333"
 export TEST_S3_REGION="us-east-1"
-export TEST_S3_ACCESS_KEY="app"
-export TEST_S3_SECRET_KEY="Logicalis70754038"
+export TEST_S3_ACCESS_KEY="<access-key>"
+export TEST_S3_SECRET_KEY="<secret-key>"
 export TEST_S3_BUCKET="s3-explorer"
 
 flutter test test/integration/us1_basic_flow_test.dart \
@@ -74,7 +74,8 @@ flutter test test/integration/us1_basic_flow_test.dart \
 - **狀態管理**：Provider
 - **路由**：go_router
 - **S3 客戶端**：aws_client 0.7.1（已升級支援 CRC64NVME checksum）
-- **版本資訊**：package_info_plus 8.0.0
+- **版本資訊**：package_info_plus 8.x
+- **預簽 URL**：SigV4 HMAC-SHA256 query signing
 - **UI 主題**：Now UI Pro Flutter（CreativeTim）
 
 ### 專案結構
@@ -148,10 +149,8 @@ flutter test
 ## 已知問題
 
 1. ⚠️ **US2 多分段上傳測試**：測試清理時的 FileSystemException（功能本身正常）
-2. ⚠️ **預簽 URL**：簡化實作，未實作完整 SigV4 簽名
-3. ⚠️ **US3 UI**：權限/同步/書籤 UI 面板尚未實作（服務層已完成）
-4. ⚠️ **Keychain 整合**：目前使用 JSON 儲存 credentials（待實作 macOS Keychain）
-5. ⚠️ **MinIO Bucket 列表**：某些 MinIO 環境返回空列表（連線正常但需檢查 IAM 權限）
+2. ⚠️ **Keychain 整合**：目前使用 JSON 儲存 credentials（待實作 macOS Keychain）
+3. ⚠️ **MinIO Bucket 列表**：某些 MinIO 環境返回空列表（連線正常但需檢查 IAM 權限）
 
 ## 開發狀態
 
@@ -162,9 +161,10 @@ flutter test
 - ✅ US2：傳輸佇列與預覽（服務 + 部分測試）
 - ✅ US3：權限與同步（服務層完整，含整合測試）
 - ✅ 額外功能：版本號顯示、遞迴目錄上傳、ACL 公開存取
+- ✅ 品質與安全：`flutter analyze` 無 issue、預簽 URL SigV4、S3 key 不再以檔案路徑正規化
 
 ### 進行中
-- 🚧 US3：UI 面板（權限、同步、書籤）
+- 🚧 Keychain 憑證儲存與既有 JSON profile 遷移
 
 ### 已規劃
 - 📋 macOS 打包與簽名腳本
@@ -172,27 +172,26 @@ flutter test
 - 📋 完整的錯誤/日誌 UI
 - 📋 最終冒煙測試
 
-## 最新更新（2026-01-14）
+## 最新更新（2026-05-18）
 
 ### 新增功能
-1. **版本號顯示**
-   - 使用 package_info_plus 套件
-   - 連接畫面：右下角顯示「S3 Explorer v1.0.0+1」
-   - 瀏覽器畫面：右下角顯示「v1.0.0+1」，帶半透明背景
+1. **版本號更新**
+   - 版本提升至 `1.0.1+2`
+   - 連接畫面與瀏覽器畫面顯示新版號
 
-2. **遞迴目錄上傳**
-   - 拖曳整個資料夾時保留完整目錄結構
-   - 實作 FileUploadInfo 類別追蹤相對路徑
+2. **SigV4 預簽 URL**
+   - 新增 `SigV4Presigner`
+   - GET/PUT 預簽 URL 產生 `X-Amz-*` query signing 參數
 
-3. **ACL 公開存取**
-   - 新增「公開」按鈕設定物件為 public-read
-   - 顯示公開 URL 並支援複製到剪貼簿
+3. **貢獻者文件**
+   - 新增根目錄 `AGENTS.md`
+   - 補充專案結構、測試、提交與安全注意事項
 
 ### 問題修復
-- ✅ 修復上傳/下載無反應問題（新增檔案系統權限）
-- ✅ 修復 CRC64NVME checksum 錯誤（升級 aws_client 至 0.7.1）
-- ✅ 移除調試日誌（清理 s3_client.dart 和 browser_viewmodel.dart）
-- ✅ 保留友善的錯誤訊息處理
+- ✅ 修復 `flutter analyze` 編譯與 lint 問題
+- ✅ 修復 widget test 入口類別不一致
+- ✅ S3 object key 不再使用本機檔案路徑正規化，避免 `..` segment 被改寫
+- ✅ 移除 ACL 快速範本中的 `public-read-write`
 
 ## 資源
 
@@ -204,4 +203,3 @@ flutter test
 ## 授權
 
 MIT
-
